@@ -1,182 +1,108 @@
-{
-  "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Plantilla para lanzar una instancia EC2, habilitar SSH y crear un bucket S3 con una VPC",
-  "Parameters": {
-    "KeyName": {
-      "Description": "Nombre del SSH KeyPair",
-      "Type": "AWS::EC2::KeyPair::KeyName",
-      "ConstraintDescription": "Proporciona el nombre de un par de claves SSH existente"
-    }
-  },
-  "Resources": {
-    "Lab16VPC": {
-      "Type": "AWS::EC2::VPC",
-      "Properties": {
-        "CidrBlock": "10.0.0.0/16",
-        "EnableDnsSupport": true,
-        "EnableDnsHostnames": true,
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "Lab16VPC"
-          }
-        ]
-      }
-    },
-    "PublicSubnet": {
-      "Type": "AWS::EC2::Subnet",
-      "Properties": {
-        "VpcId": {
-          "Ref": "Lab16VPC"
-        },
-        "CidrBlock": "10.0.0.0/24",
-        "AvailabilityZone": {
-          "Fn::Select": [
-            0,
-            {
-              "Fn::GetAZs": ""
-            }
-          ]
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "PublicSubnet"
-          }
-        ]
-      }
-    },
-    "InternetGateway": {
-      "Type": "AWS::EC2::InternetGateway",
-      "Properties": {
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "MyInternetGateway"
-          }
-        ]
-      }
-    },
-    "AttachGateway": {
-      "Type": "AWS::EC2::VPCGatewayAttachment",
-      "Properties": {
-        "VpcId": {
-          "Ref": "Lab16VPC"
-        },
-        "InternetGatewayId": {
-          "Ref": "InternetGateway"
-        }
-      }
-    },
-    "RouteTable": {
-      "Type": "AWS::EC2::RouteTable",
-      "Properties": {
-        "VpcId": {
-          "Ref": "Lab16VPC"
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "PublicRouteTable"
-          }
-        ]
-      }
-    },
-    "Route": {
-      "Type": "AWS::EC2::Route",
-      "DependsOn": "AttachGateway",
-      "Properties": {
-        "RouteTableId": {
-          "Ref": "RouteTable"
-        },
-        "DestinationCidrBlock": "0.0.0.0/0",
-        "GatewayId": {
-          "Ref": "InternetGateway"
-        }
-      }
-    },
-    "SubnetRouteTableAssociation": {
-      "Type": "AWS::EC2::SubnetRouteTableAssociation",
-      "Properties": {
-        "SubnetId": {
-          "Ref": "PublicSubnet"
-        },
-        "RouteTableId": {
-          "Ref": "RouteTable"
-        }
-      }
-    },
-    "Lab16Instance": {
-      "Type": "AWS::EC2::Instance",
-      "Properties": {
-        "InstanceType": "t2.micro",
-        "ImageId": "ami-04b70fa74e45c3917",
-        "KeyName": {
-          "Ref": "KeyName"
-        },
-        "SubnetId": {
-          "Ref": "PublicSubnet"
-        },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "Lab16"
-          }
-        ]
-      }
-    },
-    "InstanceSecurityGroup": {
-      "Type": "AWS::EC2::SecurityGroup",
-      "Properties": {
-        "GroupName": "DMZSecurityGroup",
-        "GroupDescription": "Habilitar acceso SSH via puerto 22",
-        "VpcId": {
-          "Ref": "Lab16VPC"
-        },
-        "SecurityGroupIngress": [
-          {
-            "IpProtocol": "tcp",
-            "FromPort": 22,
-            "ToPort": 22,
-            "CidrIp": "0.0.0.0/0"
-          }
-        ]
-      }
-    },
-    "Lab16DBBucket": {
-      "Type": "AWS::S3::Bucket",
-      "Properties": {
-        "BucketName": "lab16db",
-        "AccessControl": "Private"
-      }
-    }
-  },
-  "Outputs": {
-    "InstanceID": {
-      "Description": "Instance ID",
-      "Value": {
-        "Ref": "Lab16Instance"
-      }
-    },
-    "InstancePublicIP": {
-      "Description": "Public IP Address of the EC2 Instance",
-      "Value": {
-        "Fn::GetAtt": [
-          "Lab16Instance",
-          "PublicDnsName"
-        ]
-      }
-    },
-    "BucketName": {
-      "Description": "Nombre del bucket S3 creado",
-      "Value": {
-        "Ref": "Lab16DBBucket"
-      },
-      "Export": {
-        "Name": {
-          "Fn::Sub": "${AWS::StackName}-BucketName"
-        }
-      }
-    }
-  }
-}
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Plantilla para lanzar una instancia EC2, habilitar SSH y crear un bucket S3 con una VPC
+
+Parameters:
+  KeyName:
+    Description: Nombre del SSH KeyPair
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: Proporciona el nombre de un par de claves SSH existente
+
+Resources:
+  Lab16VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: '10.0.0.0/16'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: Lab16VPC
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Lab16VPC
+      CidrBlock: '10.0.0.0/24'
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]  # Selecci?n autom?tica de la primera zona de disponibilidad
+      Tags:
+        - Key: Name
+          Value: PublicSubnet
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: MyInternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Lab16VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Lab16VPC
+      Tags:
+        - Key: Name
+          Value: PublicRouteTable
+
+  Route:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  Lab16Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-04b70fa74e45c3917  
+      KeyName: !Ref KeyName
+      SubnetId: !Ref PublicSubnet  # Asociar la instancia a la subred p?blica
+      Tags:
+        - Key: Name
+          Value: Lab16
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: DMZSecurityGroup
+      GroupDescription: Habilitar acceso SSH via puerto 22
+      VpcId: !Ref Lab16VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+  Lab16DBBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: lab16db 
+      AccessControl: Private
+
+Outputs:
+  InstanceID:
+    Description: Instance ID
+    Value: !Ref Lab16Instance
+
+  InstancePublicIP:
+    Description: Public IP Address of the EC2 Instance
+    Value: !GetAtt Lab16Instance.PublicDnsName  # Obtener el nombre DNS p?blico de la instancia
+
+  BucketName:
+    Description: Nombre del bucket S3 creado
+    Value: !Ref Lab16DBBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-BucketName
